@@ -35,5 +35,7 @@ nosetests.xml
 .project
 .pydevproject
 
-wsl_env/
+# Editor specific
+.vscode/
 .idea/
+wsl_env/

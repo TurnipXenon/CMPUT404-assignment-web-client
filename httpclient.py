@@ -18,24 +18,56 @@
 # Write your own HTTP GET and POST
 # The point is to understand what you have to send and get experience with it
 
+# Some code based on lab1
+
 import sys
 import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib.parse
 
+
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
+
 
 class HTTPResponse(object):
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
 
-class HTTPClient(object):
-    #def get_host_port(self,url):
 
-    def connect(self, host, port):
+class HTTPClient(object):
+    BUFFER_SIZE = 4096
+
+    def get_remote_ip(self, host: str) -> str:
+        # todo(turnip)
+        return "127.0.0.1"
+
+        try:
+            remote_ip = socket.gethostbyname(host)
+        except socket.gaierror:
+            print('Hostname could not be resolved. Exiting')
+            sys.exit()
+
+        print(f'Ip address of {host} is {remote_ip}')
+        return remote_ip
+
+    def get_host_port(self, url: str) -> int:
+        # todo(turnip): support ipv6?
+        url_split = url.split(":")
+        if len(url_split) < 3:
+            raise Exception("Missing colon (:) indicating port area")
+
+        port_str = url_split[2]
+        end_index = port_str.find("/")
+        if end_index < 0:
+            raise Exception("Missing slash (/) indicating port end")
+        port_str = port_str[:end_index]
+
+        return int(port_str)
+
+    def connect(self, host: str, port: int) -> None:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
         return None
@@ -43,15 +75,15 @@ class HTTPClient(object):
     def get_code(self, data):
         return None
 
-    def get_headers(self,data):
+    def get_headers(self, data):
         return None
 
     def get_body(self, data):
         return None
-    
+
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
-        
+
     def close(self):
         self.socket.close()
 
@@ -68,7 +100,18 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
+        host = self.get_remote_ip(url)
+        port = self.get_host_port(url)
+        self.connect(host, port)
+        self.socket.sendall("GET / HTTP/1.1".encode("utf-8"))
+        full_data = b""
+        while True:
+            data = self.socket.recv(HTTPClient.BUFFER_SIZE)
+            if not data:
+                break
+            full_data += data
+        print(full_data)
+        code = 404
         body = ""
         return HTTPResponse(code, body)
 
@@ -79,10 +122,11 @@ class HTTPClient(object):
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
-            return self.POST( url, args )
+            return self.POST(url, args)
         else:
-            return self.GET( url, args )
-    
+            return self.GET(url, args)
+
+
 if __name__ == "__main__":
     client = HTTPClient()
     command = "GET"
@@ -90,6 +134,6 @@ if __name__ == "__main__":
         help()
         sys.exit(1)
     elif (len(sys.argv) == 3):
-        print(client.command( sys.argv[2], sys.argv[1] ))
+        print(client.command(sys.argv[2], sys.argv[1]))
     else:
-        print(client.command( sys.argv[1] ))
+        print(client.command(sys.argv[1]))
