@@ -1,3 +1,3 @@
 wsl
 source wsl_env/bin/activate
-# python freetests.py TestHTTPClient.test404GET
+# python3 freetests.py TestHTTPClient.test404GET

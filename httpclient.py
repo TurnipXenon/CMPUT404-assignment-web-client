@@ -35,15 +35,14 @@ class HTTPResponse(object):
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
+        self.headers = {}
 
 
 class HTTPClient(object):
     BUFFER_SIZE = 4096
+    USER_AGENT = "curl/7.64.1"  # todo(turnip): change
 
     def get_remote_ip(self, host: str) -> str:
-        # todo(turnip)
-        return "127.0.0.1"
-
         try:
             remote_ip = socket.gethostbyname(host)
         except socket.gaierror:
@@ -54,7 +53,6 @@ class HTTPClient(object):
         return remote_ip
 
     def get_host_port(self, url: str) -> int:
-        # todo(turnip): support ipv6?
         url_split = url.split(":")
         if len(url_split) < 3:
             raise Exception("Missing colon (:) indicating port area")
@@ -100,10 +98,32 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
+        _, netloc, path, params, query, fragment = urllib.parse.urlparse(url)
+        netloc_split = netloc.split(":")
+        if len(netloc_split) < 2:
+            raise AssertionError("Should not happen!")
+        host_name = netloc_split[0]
+        port = int(netloc_split[1])
+        host = self.get_remote_ip(host_name)
+        self.connect(host, port)
+        # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
+        self.sendall(f"""GET / HTTP/1.1
+User-Agent: {HTTPClient.USER_AGENT}
+Host: {host_name}
+Accept-Language: en-us""")
+        full_data = self.recvall(self.socket)
+        self.parse_response(full_data)
+        code = 404
+        body = ""
+        self.close()
+        return HTTPResponse(code, body)
+
+    def POST(self, url, args=None):
+        # todo(turnip)
         host = self.get_remote_ip(url)
         port = self.get_host_port(url)
         self.connect(host, port)
-        self.socket.sendall("GET / HTTP/1.1".encode("utf-8"))
+        self.socket.sendall("POST / HTTP/1.1".encode("utf-8"))
         full_data = b""
         while True:
             data = self.socket.recv(HTTPClient.BUFFER_SIZE)
@@ -115,16 +135,35 @@ class HTTPClient(object):
         body = ""
         return HTTPResponse(code, body)
 
-    def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
-
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
             return self.POST(url, args)
         else:
             return self.GET(url, args)
+
+    def parse_response(self, full_data):
+        response = HTTPResponse()
+
+        # split the data
+        lines = full_data.splitlines()
+        line_1 = lines[0].split(" ")
+        lines.pop(0)  # remove the first line
+
+        raw_headers = []
+        for ind in range(len(lines)):
+            if lines[ind].strip() == "":
+                raw_headers = lines[:ind:]
+
+                raw_body = lines[ind:]
+                if len(raw_body) > 1:
+                    response.body = "\n".join(raw_body[1:])
+
+        # understand the data
+        response.code = int(line_1[1])
+        for raw_entry in raw_headers:
+            entry = raw_entry.split(": ", 1)
+            response.headers[entry[0]] = entry[1]
+        return response
 
 
 if __name__ == "__main__":
