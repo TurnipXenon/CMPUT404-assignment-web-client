@@ -42,6 +42,14 @@ class HTTPClient(object):
     BUFFER_SIZE = 4096
     USER_AGENT = "curl/7.64.1"  # todo(turnip): change
 
+    def __init__(self):
+        self.host_name = None
+        self.netloc = None
+        self.path = None
+        self.params = None
+        self.query = None
+        self.fragment = None
+
     def get_remote_ip(self, host: str) -> str:
         try:
             remote_ip = socket.gethostbyname(host)
@@ -98,48 +106,45 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        _, netloc, path, params, query, fragment = urllib.parse.urlparse(url)
-        netloc_split = netloc.split(":")
-        if len(netloc_split) < 2:
-            raise AssertionError("Should not happen!")
-        host_name = netloc_split[0]
-        port = int(netloc_split[1])
-        host = self.get_remote_ip(host_name)
-        self.connect(host, port)
-        # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
-        self.sendall(f"""GET / HTTP/1.1
-User-Agent: {HTTPClient.USER_AGENT}
-Host: {host_name}
-Accept-Language: en-us""")
+        self.raw_connect(url)
+        req = self.create_request("GET")
+        self.sendall(req)
         full_data = self.recvall(self.socket)
-        self.parse_response(full_data)
-        code = 404
-        body = ""
+        resp = self.parse_response(full_data)
         self.close()
-        return HTTPResponse(code, body)
+        return resp
 
     def POST(self, url, args=None):
-        # todo(turnip)
-        host = self.get_remote_ip(url)
-        port = self.get_host_port(url)
-        self.connect(host, port)
-        self.socket.sendall("POST / HTTP/1.1".encode("utf-8"))
-        full_data = b""
-        while True:
-            data = self.socket.recv(HTTPClient.BUFFER_SIZE)
-            if not data:
-                break
-            full_data += data
-        print(full_data)
-        code = 404
-        body = ""
-        return HTTPResponse(code, body)
+        self.raw_connect(url)
+        req = self.create_request("POST")
+        self.sendall(req)
+        full_data = self.recvall(self.socket)
+        resp = self.parse_response(full_data)
+        self.close()
+        return resp
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
             return self.POST(url, args)
         else:
             return self.GET(url, args)
+
+    def raw_connect(self, url):
+        _, self.netloc, self.path, self.params, self.query, self.fragment = urllib.parse.urlparse(url)
+        netloc_split = self.netloc.split(":")
+        if len(netloc_split) < 2:
+            raise AssertionError("Should not happen!")
+        self.host_name = netloc_split[0]
+        port = int(netloc_split[1])
+        host = self.get_remote_ip(self.host_name)
+        self.connect(host, port)
+
+    def create_request(self, command_string):
+        # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
+        return f"""{command_string} / HTTP/1.1
+User-Agent: {HTTPClient.USER_AGENT}
+Host: {self.host_name}
+Accept-Language: en-us"""
 
     def parse_response(self, full_data):
         response = HTTPResponse()
