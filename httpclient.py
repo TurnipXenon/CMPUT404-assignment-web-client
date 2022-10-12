@@ -50,7 +50,7 @@ class HTTPClient(object):
         self.query = None
         self.fragment = None
 
-    def get_remote_ip(self, host: str) -> str:
+    def get_remote_ip(self, host) -> str:
         try:
             remote_ip = socket.gethostbyname(host)
         except socket.gaierror:
@@ -60,7 +60,7 @@ class HTTPClient(object):
         print(f'Ip address of {host} is {remote_ip}')
         return remote_ip
 
-    def get_host_port(self, url: str) -> int:
+    def get_host_port(self, url) -> int:
         url_split = url.split(":")
         if len(url_split) < 3:
             raise Exception("Missing colon (:) indicating port area")
@@ -73,7 +73,7 @@ class HTTPClient(object):
 
         return int(port_str)
 
-    def connect(self, host: str, port: int) -> None:
+    def connect(self, host, port) -> None:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
         return None
@@ -144,7 +144,9 @@ class HTTPClient(object):
         return f"""{command_string} / HTTP/1.1
 User-Agent: {HTTPClient.USER_AGENT}
 Host: {self.host_name}
-Accept-Language: en-us"""
+Accept-Language: en-us
+
+""".replace("\n", "\r\n")
 
     def parse_response(self, full_data):
         response = HTTPResponse()
