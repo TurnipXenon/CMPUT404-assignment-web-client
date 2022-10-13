@@ -19,7 +19,7 @@
 # The point is to understand what you have to send and get experience with it
 
 # Some code based on lab1
-
+import json
 import sys
 import socket
 import re
@@ -106,17 +106,14 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        self.raw_connect(url)
-        req = self.create_request("GET")
-        self.sendall(req)
-        full_data = self.recvall(self.socket)
-        resp = self.parse_response(full_data)
-        self.close()
-        return resp
+        return self.do_command(url, "GET", args)
 
     def POST(self, url, args=None):
+        return self.do_command(url, "POST", args)
+
+    def do_command(self, url, command="GET", args=None):
         self.raw_connect(url)
-        req = self.create_request("POST")
+        req = self.create_request(command, args)
         self.sendall(req)
         full_data = self.recvall(self.socket)
         resp = self.parse_response(full_data)
@@ -124,29 +121,38 @@ class HTTPClient(object):
         return resp
 
     def command(self, url, command="GET", args=None):
-        if (command == "POST"):
-            return self.POST(url, args)
-        else:
-            return self.GET(url, args)
+        return self.do_command(url, command, args)
 
     def raw_connect(self, url):
         _, self.netloc, self.path, self.params, self.query, self.fragment = urllib.parse.urlparse(url)
         netloc_split = self.netloc.split(":")
         if len(netloc_split) < 2:
-            raise AssertionError("Should not happen!")
+            port = 80
+        else:
+            port = int(netloc_split[1])
         self.host_name = netloc_split[0]
-        port = int(netloc_split[1])
         host = self.get_remote_ip(self.host_name)
         self.connect(host, port)
 
-    def create_request(self, command_string):
+    def create_request(self, command_string, args=None):
         # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
-        return f"""{command_string} / HTTP/1.1
-User-Agent: {HTTPClient.USER_AGENT}
-Host: {self.host_name}
-Accept-Language: en-us
+        # todo(turnip): don't hardcode content-length
+        contents = [f"{command_string} {self.path} HTTP/1.1",
+                    f"User-Agent: {HTTPClient.USER_AGENT}",
+                    f"Host: {self.host_name}"]
+        body = ""
+        if command_string == "POST":
+            # todo(turnip): don't hardcode content length
+            # from: https://stackoverflow.com/a/30686735/17836168
+            if args is not None:
+                body = urllib.parse.urlencode(args, quote_via=urllib.parse.quote)
+                contents.append("Content-type: application/x-www-form-urlencoded")
+            content_length = len(body.encode("utf-8"))
+            contents.append(f"Content-Length: {content_length}")
+        contents.append("")
+        contents.append(body)
 
-""".replace("\n", "\r\n")
+        return "\r\n".join(contents)
 
     def parse_response(self, full_data):
         response = HTTPResponse()
@@ -164,6 +170,7 @@ Accept-Language: en-us
                 raw_body = lines[ind:]
                 if len(raw_body) > 1:
                     response.body = "\n".join(raw_body[1:])
+                break
 
         # understand the data
         response.code = int(line_1[1])
