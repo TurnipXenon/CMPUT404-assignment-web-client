@@ -135,6 +135,28 @@ class HTTPClient(object):
         host = self.get_remote_ip(self.host_name)
         self.connect(host, port)
 
+    # Reference: https://en.wikipedia.org/wiki/Percent-encoding#Reserved_characters
+    SPECIAL_CHARACTERS = "\r\n !#$%&'()*+,/:;=?@[]%"
+    # magic number from https://stackoverflow.com/a/196392/17836168
+    MAX_ASCII = 128
+    SPECIAL_MATCH = [("\\", "%"), ("r'", "0D"), ("n'", "0A")]
+
+    def percent_encode_string(self, old_string):
+        new_string = ""
+        for character in old_string:
+            # check if need to encode
+            if character not in HTTPClient.SPECIAL_CHARACTERS and ord(character) < 128:
+                new_string += character
+                continue
+
+            # encode
+            encoded = str(character.encode("utf-8"))
+            encoded = encoded[2:]
+            for old, new in HTTPClient.SPECIAL_MATCH:
+                encoded = encoded.replace(old, new)
+            new_string += encoded
+        return new_string
+
     def create_request(self, command_string, args=None):
         # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
         contents = [f"{command_string} {self.path} HTTP/1.1",
@@ -143,10 +165,14 @@ class HTTPClient(object):
                     "Accept: */*"]
         body = ""
         if command_string == "POST":
-            # from: https://stackoverflow.com/a/30686735/17836168
             if args is not None:
-                body = urllib.parse.urlencode(args, quote_via=urllib.parse.quote)
+                raw_entry = []
+                for k, v in args.items():
+                    raw_entry.append(f"{self.percent_encode_string(k)}={self.percent_encode_string(v)}")
+                body = "&".join(raw_entry)
                 contents.append("Content-type: application/x-www-form-urlencoded")
+
+            # from: https://stackoverflow.com/a/30686735/17836168
             content_length = len(body.encode("utf-8"))
             contents.append(f"Content-Length: {content_length}")
         contents.append("")
@@ -154,11 +180,12 @@ class HTTPClient(object):
         contents.append("")
 
         return "\r\n".join(contents)
-#         return """GET / HTTP/1.1
-# Host: www.cs.ualberta.ca
-# User-Agent: curl/7.68.0
-# Accept: */*
-# """.replace("\n", "\r\n")
+
+    #         return """GET / HTTP/1.1
+    # Host: www.cs.ualberta.ca
+    # User-Agent: curl/7.68.0
+    # Accept: */*
+    # """.replace("\n", "\r\n")
 
     def parse_response(self, full_data):
         response = HTTPResponse()

@@ -256,13 +256,6 @@ class TestHTTPClient(unittest.TestCase):
         for key in outargs:
             self.assertTrue(args[key] == outargs[key][0], "Key [%s] not found" % key)
 
-    # region custom tests
-    # def test_get_remote_ip(self):
-    #     http = httpclass.HTTPClient()
-    #     self.assertEqual(http.get_remote_ip("127.0.0.1"), "127.0.0.1")
-    #     # todo(turnip): add more tests
-    # endregion custom tests
-
     @classmethod
     def tearDownClass(self):        
         if (TestHTTPClient.httpd!=None):
