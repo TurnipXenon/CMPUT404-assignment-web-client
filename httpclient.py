@@ -40,7 +40,7 @@ class HTTPResponse(object):
 
 class HTTPClient(object):
     BUFFER_SIZE = 4096
-    USER_AGENT = "curl/7.64.1"  # todo(turnip): change
+    USER_AGENT = "curl/7.68.0"
 
     def __init__(self):
         self.host_name = None
@@ -116,6 +116,7 @@ class HTTPClient(object):
         req = self.create_request(command, args)
         self.sendall(req)
         full_data = self.recvall(self.socket)
+        print(full_data)
         resp = self.parse_response(full_data)
         self.close()
         return resp
@@ -136,13 +137,12 @@ class HTTPClient(object):
 
     def create_request(self, command_string, args=None):
         # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
-        # todo(turnip): don't hardcode content-length
         contents = [f"{command_string} {self.path} HTTP/1.1",
+                    f"Host: {self.host_name}",
                     f"User-Agent: {HTTPClient.USER_AGENT}",
-                    f"Host: {self.host_name}"]
+                    "Accept: */*"]
         body = ""
         if command_string == "POST":
-            # todo(turnip): don't hardcode content length
             # from: https://stackoverflow.com/a/30686735/17836168
             if args is not None:
                 body = urllib.parse.urlencode(args, quote_via=urllib.parse.quote)
@@ -151,8 +151,14 @@ class HTTPClient(object):
             contents.append(f"Content-Length: {content_length}")
         contents.append("")
         contents.append(body)
+        contents.append("")
 
         return "\r\n".join(contents)
+#         return """GET / HTTP/1.1
+# Host: www.cs.ualberta.ca
+# User-Agent: curl/7.68.0
+# Accept: */*
+# """.replace("\n", "\r\n")
 
     def parse_response(self, full_data):
         response = HTTPResponse()
