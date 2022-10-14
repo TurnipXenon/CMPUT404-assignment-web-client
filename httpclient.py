@@ -159,33 +159,32 @@ class HTTPClient(object):
 
     def create_request(self, command_string, args=None):
         # Reference: https://www.rfc-editor.org/rfc/rfc9110.html#section-3.9
-        contents = [f"{command_string} {self.path} HTTP/1.1",
+        path = self.path if self.path is not None and self.path != "" else "/"
+        contents = [f"{command_string} {path} HTTP/1.1",
                     f"Host: {self.host_name}",
                     f"User-Agent: {HTTPClient.USER_AGENT}",
                     "Accept: */*"]
         body = ""
         if command_string == "POST":
-            if args is not None:
+            if args is not None or self.params != "":
                 raw_entry = []
-                for k, v in args.items():
-                    raw_entry.append(f"{self.percent_encode_string(k)}={self.percent_encode_string(v)}")
+                if args is not None:
+                    for k, v in args.items():
+                        raw_entry.append(f"{self.percent_encode_string(k)}={self.percent_encode_string(v)}")
+                if self.params != "":
+                    raw_entry.append(self.params)
                 body = "&".join(raw_entry)
                 contents.append("Content-type: application/x-www-form-urlencoded")
 
             # from: https://stackoverflow.com/a/30686735/17836168
             content_length = len(body.encode("utf-8"))
             contents.append(f"Content-Length: {content_length}")
+
         contents.append("")
         contents.append(body)
         contents.append("")
 
         return "\r\n".join(contents)
-
-    #         return """GET / HTTP/1.1
-    # Host: www.cs.ualberta.ca
-    # User-Agent: curl/7.68.0
-    # Accept: */*
-    # """.replace("\n", "\r\n")
 
     def parse_response(self, full_data):
         response = HTTPResponse()
