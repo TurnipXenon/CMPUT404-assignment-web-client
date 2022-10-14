@@ -19,10 +19,8 @@
 # The point is to understand what you have to send and get experience with it
 
 # Some code based on lab1
-import json
 import sys
 import socket
-import re
 # you may use urllib to encode data appropriately
 import urllib.parse
 
@@ -163,6 +161,7 @@ class HTTPClient(object):
         contents = [f"{command_string} {path} HTTP/1.1",
                     f"Host: {self.host_name}",
                     f"User-Agent: {HTTPClient.USER_AGENT}",
+                    "Connection: close",  # https://uofa-cmput404.github.io/cmput404-slides/05-More-HTTP.html#/61
                     "Accept: */*"]
         body = ""
         if command_string == "POST":
