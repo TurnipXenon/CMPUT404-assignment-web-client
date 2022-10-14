@@ -181,7 +181,6 @@ class HTTPClient(object):
 
         contents.append("")
         contents.append(body)
-        contents.append("")
 
         return "\r\n".join(contents)
 
